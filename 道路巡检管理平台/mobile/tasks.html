@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时任务 - 道路巡检APP</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Barlow', 'Noto Sans SC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+            background-color: #ffffff;
+            color: #1e293b;
+            position: relative;
+            min-height: 100vh;
+        }
+        
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            z-index: 10;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(4px);
+        }
+        
+        .priority-high {
+            border-left: 4px solid #ef4444;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+        }
+        
+        .priority-medium {
+            border-left: 4px solid #f59e0b;
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+        }
+        
+        .priority-low {
+            border-left: 4px solid #3b82f6;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+        }
+        
+        .action-button {
+            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .action-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 4px rgba(37, 99, 235, 0.2);
+        }
+        
+        .tab-active {
+            color: #3b82f6;
+            font-weight: 600;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        .ios-header {
+            padding-top: env(safe-area-inset-top, 20px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .ios-footer {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .card-shadow {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .card-shadow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .grid-bg {
+            position: relative;
+        }
+        
+        .grid-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+            z-index: -1;
+        }
+        
+        .glow-text {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        .neon-border {
+            position: relative;
+        }
+        
+        .neon-border::after {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #3b82f6);
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .neon-border:hover::after {
+            opacity: 0.5;
+        }
+        
+        .tech-gradient {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+        }
+        
+        .badge-glow {
+            animation: badge-pulse 2s infinite;
+        }
+        
+        @keyframes badge-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+            }
+            70% {
+                box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+        
+        .btn-hover-effect {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-hover-effect::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+            transition: all 0.6s ease;
+        }
+        
+        .btn-hover-effect:hover::before {
+            left: 100%;
+        }
+    </style>
+</head>
+<body class="grid-bg">
+    <!-- 状态栏 -->
+    <div class="ios-header z-10 sticky top-0">
+        <div class="flex justify-between items-center px-4 py-3">
+            <div class="text-lg font-bold glow-text">实时任务</div>
+            <div class="flex items-center">
+                <button class="w-8 h-8 flex items-center justify-center text-blue-500 rounded-full mr-1 focus:outline-none hover:text-blue-600 transition-colors">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="w-8 h-8 flex items-center justify-center text-blue-500 rounded-full focus:outline-none hover:text-blue-600 transition-colors relative">
+                    <i class="fas fa-bell"></i>
+                    <span class="absolute top-2 right-3 w-2 h-2 bg-red-500 rounded-full badge-glow"></span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 任务分类标签 -->
+        <div class="flex border-b border-gray-200">
+            <div class="w-1/3 py-3 text-center tab-active">
+                待处理 <span class="ml-1 bg-red-500 text-white text-xs px-1.5 rounded-full">3</span>
+            </div>
+            <div class="w-1/3 py-3 text-center text-gray-500">
+                进行中 <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 rounded-full">2</span>
+            </div>
+            <div class="w-1/3 py-3 text-center text-gray-500">
+                已完成 <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 rounded-full">8</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 地图和任务列表切换器 -->
+    <div class="px-4 py-3 flex justify-between items-center">
+        <div class="text-sm text-gray-500">2023年5月18日 星期四</div>
+        <div class="bg-gray-100 rounded-full p-0.5 flex">
+            <button class="rounded-full bg-blue-500 px-4 py-1 text-sm shadow-sm text-white">
+                <i class="fas fa-list-ul mr-1"></i> 列表
+            </button>
+            <button class="rounded-full px-4 py-1 text-sm text-gray-600">
+                <i class="fas fa-map-marker-alt mr-1"></i> 地图
+            </button>
+        </div>
+    </div>
+    
+    <!-- 待处理任务列表 -->
+    <div class="px-4 pb-24">
+        <!-- 紧急任务卡片 -->
+        <div class="rounded-xl overflow-hidden mb-4 card-shadow priority-high">
+            <div class="p-4 relative">
+                <span class="status-badge bg-red-100 text-red-600">紧急</span>
+                <div class="flex items-start">
+                    <div class="w-20 h-20 mr-3 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src="https://img0.baidu.com/it/u=3371027925,184589127&fm=253&fmt=auto&app=120&f=JPEG?w=1023&h=682" 
+                             alt="路面裂缝" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800 mb-1">路面龟裂 - C02</h3>
+                        <p class="text-gray-500 text-sm mb-2">甬莞高速 K125+800 右侧车道</p>
+                        <div class="flex items-center text-xs text-gray-500 mb-2">
+                            <i class="fas fa-clock mr-1 text-blue-500"></i> 15分钟前发现
+                        </div>
+                        <div class="flex flex-wrap items-center text-xs">
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mr-2 mb-1 border border-gray-200">
+                                <i class="fas fa-ruler-combined mr-1 text-blue-500"></i> 2.5m²
+                            </div>
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mr-2 mb-1 border border-gray-200">
+                                <i class="fas fa-car mr-1 text-green-400"></i> 车辆A
+                            </div>
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mb-1 border border-gray-200">
+                                <i class="fas fa-thermometer-half mr-1 text-red-400"></i> 高温
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between mt-4">
+                    <button class="px-3 py-1.5 border border-gray-300 text-sm rounded-full text-gray-600 hover:border-blue-500 transition-colors btn-hover-effect">
+                        <i class="fas fa-map-marker-alt mr-1 text-blue-500"></i> 导航
+                    </button>
+                    <button class="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-400 text-white text-sm rounded-full shadow-sm hover:shadow-blue-500/10 btn-hover-effect">
+                        <i class="fas fa-clipboard-check mr-1"></i> 开始处理
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 普通任务卡片 -->
+        <div class="rounded-xl overflow-hidden mb-4 card-shadow priority-medium">
+            <div class="p-4 relative">
+                <span class="status-badge bg-yellow-100 text-yellow-600">中等</span>
+                <div class="flex items-start">
+                    <div class="w-20 h-20 mr-3 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src="https://images.unsplash.com/photo-1516226803768-5ca3917fb1a9?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=200&q=80" 
+                             alt="路面坑洞" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800 mb-1">路面坑洞 - C01</h3>
+                        <p class="text-gray-500 text-sm mb-2">莞佛高速 K78+200 中间车道</p>
+                        <div class="flex items-center text-xs text-gray-500 mb-2">
+                            <i class="fas fa-clock mr-1 text-blue-500"></i> 2小时前发现
+                        </div>
+                        <div class="flex flex-wrap items-center text-xs">
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mr-2 mb-1 border border-gray-200">
+                                <i class="fas fa-ruler-combined mr-1 text-blue-500"></i> 0.8m²
+                            </div>
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mr-2 mb-1 border border-gray-200">
+                                <i class="fas fa-car mr-1 text-green-500"></i> 车辆B
+                            </div>
+                            <div class="bg-gray-100 rounded-full px-2 py-1 mb-1 border border-gray-200">
+                                <i class="fas fa-cloud-rain mr-1 text-blue-500"></i> 雨天
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between mt-4">
+                    <button class="px-3 py-1.5 border border-gray-300 text-sm rounded-full text-gray-600 hover:border-blue-500 transition-colors btn-hover-effect">
+                        <i class="fas fa-map-marker-alt mr-1 text-blue-500"></i> 导航
+                    </button>
+                    <button class="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-400 text-white text-sm rounded-full shadow-sm hover:shadow-blue-500/10 btn-hover-effect">
+                        <i class="fas fa-clipboard-check mr-1"></i> 开始处理
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 普通任务卡片 -->
+        <div class="rounded-xl overflow-hidden mb-4 card-shadow priority-low">
+            <div class="p-4 relative">
+                <span class="status-badge bg-blue-900/50 text-blue-400">普通</span>
+                <div class="flex items-start">
+                    <div class="w-20 h-20 mr-3 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src="https://images.unsplash.com/photo-1574621990186-d1eb93b3803a?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=200&q=80" 
+                             alt="边缘破损" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-white mb-1">边缘破损 - C03</h3>
+                        <p class="text-gray-400 text-sm mb-2">广惠高速 K32+400 应急车道</p>
+                        <div class="flex items-center text-xs text-gray-400 mb-2">
+                            <i class="fas fa-clock mr-1 text-blue-400"></i> 昨天 16:30
+                        </div>
+                        <div class="flex flex-wrap items-center text-xs">
+                            <div class="bg-gray-800/80 rounded-full px-2 py-1 mr-2 mb-1 border border-blue-900/30">
+                                <i class="fas fa-ruler-combined mr-1 text-blue-400"></i> 1.2m²
+                            </div>
+                            <div class="bg-gray-800/80 rounded-full px-2 py-1 mr-2 mb-1 border border-green-900/30">
+                                <i class="fas fa-car mr-1 text-green-400"></i> 车辆C
+                            </div>
+                            <div class="bg-gray-800/80 rounded-full px-2 py-1 mb-1 border border-yellow-900/30">
+                                <i class="fas fa-sun mr-1 text-yellow-400"></i> 晴天
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between mt-4">
+                    <button class="px-3 py-1.5 border border-gray-300 text-sm rounded-full text-gray-600 hover:border-blue-500 transition-colors btn-hover-effect">
+                        <i class="fas fa-map-marker-alt mr-1 text-blue-500"></i> 导航
+                    </button>
+                    <button class="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-400 text-white text-sm rounded-full shadow-sm hover:shadow-blue-500/10 btn-hover-effect">
+                        <i class="fas fa-clipboard-check mr-1"></i> 开始处理
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部操作栏 -->
+    <div class="ios-footer fixed bottom-0 left-0 right-0 pt-2 pb-5 px-6 z-20">
+        <div class="flex justify-between items-center">
+            <a href="tasks.html" class="text-blue-500 text-center w-1/5">
+                <i class="fas fa-clipboard-list text-xl"></i>
+                <div class="text-xs mt-1">任务</div>
+            </a>
+            <a href="map-navigation.html" class="text-gray-500 text-center w-1/5 hover:text-gray-700 transition-colors">
+                <i class="fas fa-map-marked-alt text-xl"></i>
+                <div class="text-xs mt-1">地图</div>
+            </a>
+            <div class="w-1/5 flex justify-center">
+                <button class="action-button">
+                    <i class="fas fa-camera text-xl text-white"></i>
+                </button>
+            </div>
+            <a href="statistics.html" class="text-gray-500 text-center w-1/5 hover:text-gray-700 transition-colors">
+                <i class="fas fa-chart-bar text-xl"></i>
+                <div class="text-xs mt-1">统计</div>
+            </a>
+            <a href="profile.html" class="text-gray-500 text-center w-1/5 hover:text-gray-700 transition-colors">
+                <i class="fas fa-user text-xl"></i>
+                <div class="text-xs mt-1">我的</div>
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // 任务长按置顶功能
+        document.querySelectorAll('.card-shadow').forEach(card => {
+            let timeoutId;
+            
+            card.addEventListener('touchstart', function() {
+                timeoutId = setTimeout(() => {
+                    // 显示一个长按提示
+                    console.log('长按任务卡片，触发置顶/标记紧急');
+                    
+                    // 这里可以添加显示操作菜单的代码
+                    const menu = document.createElement('div');
+                    menu.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white backdrop-filter backdrop-blur-lg rounded-lg shadow-md z-50 w-64 overflow-hidden border border-gray-200';
+                    menu.innerHTML = `
+                        <div class="p-4 bg-gray-50 text-center font-medium border-b border-gray-200 text-gray-800">操作选项</div>
+                        <div class="p-4 border-b border-gray-200 flex items-center text-red-500 hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-exclamation-triangle mr-3"></i>
+                            标记为紧急
+                        </div>
+                        <div class="p-4 border-b border-gray-200 flex items-center text-gray-700 hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-thumbtack mr-3"></i>
+                            置顶任务
+                        </div>
+                        <div class="p-4 border-b border-gray-200 flex items-center text-gray-700 hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-share-alt mr-3"></i>
+                            分享任务
+                        </div>
+                        <div class="p-4 flex items-center text-gray-500 hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-times mr-3"></i>
+                            取消
+                        </div>
+                    `;
+                    
+                    // 显示操作菜单
+                    document.body.appendChild(menu);
+                    
+                    // 点击任意位置关闭菜单
+                    function closeMenu() {
+                        document.body.removeChild(menu);
+                        document.removeEventListener('click', closeMenu);
+                    }
+                    
+                    setTimeout(() => {
+                        document.addEventListener('click', closeMenu);
+                    }, 100);
+                    
+                }, 800); // 长按时间超过800ms触发
+            });
+            
+            card.addEventListener('touchend', function() {
+                clearTimeout(timeoutId);
+            });
+            
+            card.addEventListener('touchcancel', function() {
+                clearTimeout(timeoutId);
+            });
+        });
+        
+        // 拍照按钮点击事件
+        document.querySelector('.action-button').addEventListener('click', function() {
+            console.log('打开相机拍照功能，添加AR定位网格');
+            
+            // 这里可以添加打开相机的代码
+            alert('已打开相机功能，可用于拍摄病害并自动识别类型');
+        });
+    </script>
+</body>
+</html> 

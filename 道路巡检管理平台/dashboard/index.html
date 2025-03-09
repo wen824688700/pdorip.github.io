@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>病害热力地图 - 道路巡检智能管控平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-light: #60a5fa;
+            --primary-dark: #2563eb;
+            --accent: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-main: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        body {
+            background: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .map-container {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .map-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(45deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05));
+            pointer-events: none;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 50%;
+            background: inherit;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.5); opacity: 0.15; }
+            100% { transform: scale(1); opacity: 0.3; }
+        }
+
+        .status-dot.green {
+            background: var(--success);
+            box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-dot.yellow {
+            background: var(--warning);
+            box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+        }
+
+        .status-dot.red {
+            background: var(--danger);
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 1s ease-in-out;
+            stroke: var(--primary);
+            stroke-linecap: round;
+        }
+
+        .glow-effect {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glow-effect::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: glow 2s linear infinite;
+        }
+
+        @keyframes glow {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .data-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .chart-container {
+            position: relative;
+        }
+
+        .chart-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, 
+                rgba(59, 130, 246, 0.1), 
+                rgba(99, 102, 241, 0.1)
+            );
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .grid-line {
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-dasharray: 4;
+        }
+
+        .value-text {
+            font-family: 'Monaco', monospace;
+            font-weight: 600;
+            color: var(--primary-light);
+            text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+        }
+
+        .neon-border {
+            position: relative;
+        }
+
+        .neon-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 2px;
+            border-radius: inherit;
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="grid grid-cols-12 gap-4 h-full">
+        <!-- 主地图区域 -->
+        <div class="col-span-8 map-container relative">
+            <img src="https://images.unsplash.com/photo-1610548806941-8a8f2a1db58d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1350&q=80" 
+                 alt="热力地图" class="w-full h-full object-cover">
+                 
+            <!-- 路网热力图模拟图层 -->
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent" 
+                 style="background-image: radial-gradient(circle at 30% 50%, rgba(255, 0, 0, 0.7) 0%, rgba(255, 0, 0, 0) 13%), 
+                                         radial-gradient(circle at 45% 30%, rgba(255, 40, 0, 0.7) 0%, rgba(255, 40, 0, 0) 15%),
+                                         radial-gradient(circle at 60% 70%, rgba(255, 90, 0, 0.7) 0%, rgba(255, 90, 0, 0) 17%),
+                                         radial-gradient(circle at 75% 40%, rgba(255, 0, 0, 0.7) 0%, rgba(255, 0, 0, 0) 10%);">
+            </div>
+            
+            <!-- 巡检车实时位置标记 -->
+            <div class="absolute" style="left: 25%; top: 40%;">
+                <div class="relative">
+                    <i class="fas fa-car-side text-blue-600 text-xl"></i>
+                    <span class="absolute -top-3 -right-3 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">1</span>
+                </div>
+            </div>
+            
+            <div class="absolute" style="left: 60%; top: 60%;">
+                <div class="relative">
+                    <i class="fas fa-truck text-green-600 text-xl"></i>
+                    <span class="absolute -top-3 -right-3 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">2</span>
+                </div>
+            </div>
+            
+            <!-- 图例 -->
+            <div class="absolute bottom-3 left-3 bg-white bg-opacity-75 p-2 rounded-lg text-xs flex flex-col">
+                <div class="flex items-center mb-1">
+                    <div class="w-3 h-3 rounded-full bg-red-600 mr-1"></div>
+                    <span>严重病害</span>
+                </div>
+                <div class="flex items-center mb-1">
+                    <div class="w-3 h-3 rounded-full bg-orange-500 mr-1"></div>
+                    <span>中度病害</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-3 h-3 rounded-full bg-yellow-400 mr-1"></div>
+                    <span>轻微病害</span>
+                </div>
+            </div>
+            
+            <!-- 地图工具按钮 -->
+            <div class="absolute top-3 right-3 flex flex-col">
+                <button class="bg-white rounded-lg p-2 shadow mb-2 hover:bg-gray-100">
+                    <i class="fas fa-plus text-gray-700"></i>
+                </button>
+                <button class="bg-white rounded-lg p-2 shadow mb-2 hover:bg-gray-100">
+                    <i class="fas fa-minus text-gray-700"></i>
+                </button>
+                <button class="bg-white rounded-lg p-2 shadow mb-2 hover:bg-gray-100">
+                    <i class="fas fa-sync text-gray-700"></i>
+                </button>
+                <button class="bg-white rounded-lg p-2 shadow hover:bg-gray-100">
+                    <i class="fas fa-layer-group text-gray-700"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 右侧悬浮面板 -->
+        <div class="col-span-4 flex flex-col gap-4">
+            <!-- 巡查指数卡片 -->
+            <div class="card p-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">巡查指数</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600 mb-1">
+                            <span class="odometer">3,482</span>
+                        </div>
+                        <div class="text-sm text-gray-500">总次数</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600 mb-1">
+                            <span class="odometer">12,564</span>
+                        </div>
+                        <div class="text-sm text-gray-500">总里程 (km)</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-purple-600 mb-1">
+                            <span class="odometer">8,245</span>
+                        </div>
+                        <div class="text-sm text-gray-500">总时长 (h)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 巡查覆盖率环形图 -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">巡查覆盖率</h3>
+                    <div class="flex text-sm">
+                        <span class="px-2 py-1 bg-blue-500 text-white rounded-l-md cursor-pointer">月</span>
+                        <span class="px-2 py-1 bg-gray-200 cursor-pointer">年</span>
+                        <span class="px-2 py-1 bg-gray-200 cursor-pointer">周</span>
+                        <span class="px-2 py-1 bg-gray-200 rounded-r-md cursor-pointer">日</span>
+                    </div>
+                </div>
+                <div class="flex justify-center items-center">
+                    <div class="relative w-32 h-32">
+                        <svg class="progress-ring" width="128" height="128">
+                            <circle
+                                class="progress-ring__circle progress-ring__circle--bg"
+                                stroke="#e5e7eb"
+                                stroke-width="8"
+                                fill="transparent"
+                                r="58"
+                                cx="64"
+                                cy="64"/>
+                            <circle
+                                class="progress-ring__circle"
+                                stroke="#3b82f6"
+                                stroke-dasharray="364.42"
+                                stroke-dashoffset="91.105"
+                                stroke-width="8"
+                                fill="transparent"
+                                r="58"
+                                cx="64"
+                                cy="64"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-blue-600">75%</div>
+                                <div class="text-xs text-gray-500">当月覆盖</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 病害统计三栏 -->
+            <div class="card p-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">病害统计</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-500">当月总数</span>
+                            <i class="fas fa-arrow-up text-red-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">2,341</div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-500">新增</span>
+                            <i class="fas fa-arrow-down text-green-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">183</div>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-500">已修复</span>
+                            <i class="fas fa-arrow-up text-green-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">256</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部面板 -->
+        <div class="col-span-12 grid grid-cols-3 gap-4">
+            <!-- 病害分类占比扇形图 -->
+            <div class="card p-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">病害分类占比</h3>
+                <div class="flex justify-between items-center">
+                    <div class="w-40 h-40 mx-auto">
+                        <!-- 简单的SVG扇形图 -->
+                        <svg viewBox="0 0 100 100">
+                            <!-- C01-坑槽类 -->
+                            <path d="M50 50 L50 0 A50 50 0 0 1 100 50 Z" fill="#3b82f6"></path>
+                            <!-- C02-龟裂类 -->
+                            <path d="M50 50 L100 50 A50 50 0 0 1 50 100 Z" fill="#10b981"></path>
+                            <!-- C03-边缘破损 -->
+                            <path d="M50 50 L50 100 A50 50 0 0 1 0 50 Z" fill="#f59e0b"></path>
+                            <!-- C04-其他病害 -->
+                            <path d="M50 50 L0 50 A50 50 0 0 1 50 0 Z" fill="#ef4444"></path>
+                        </svg>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="text-sm">C01-坑槽类 (35%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                            <span class="text-sm">C02-龟裂类 (25%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <span class="text-sm">C03-边缘破损 (20%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                            <span class="text-sm">C04-其他病害 (20%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 路段桩号病害TOP5条形图 -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">路段桩号病害TOP5</h3>
+                    <div class="flex text-sm">
+                        <span class="px-2 py-1 bg-blue-500 text-white rounded-l-md cursor-pointer">甬莞高速</span>
+                        <span class="px-2 py-1 bg-gray-200 rounded-r-md cursor-pointer">莞佛高速</span>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <span class="text-sm w-24">K125+800</span>
+                        <div class="flex-1 h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full" style="width: 85%"></div>
+                        </div>
+                        <span class="text-sm ml-2 w-10">85</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-sm w-24">K078+200</span>
+                        <div class="flex-1 h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full" style="width: 72%"></div>
+                        </div>
+                        <span class="text-sm ml-2 w-10">72</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-sm w-24">K156+100</span>
+                        <div class="flex-1 h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full" style="width: 63%"></div>
+                        </div>
+                        <span class="text-sm ml-2 w-10">63</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-sm w-24">K032+400</span>
+                        <div class="flex-1 h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full" style="width: 51%"></div>
+                        </div>
+                        <span class="text-sm ml-2 w-10">51</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-sm w-24">K094+700</span>
+                        <div class="flex-1 h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full" style="width: 42%"></div>
+                        </div>
+                        <span class="text-sm ml-2 w-10">42</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 病害时间趋势图 -->
+            <div class="card p-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">病害时间趋势</h3>
+                <div class="relative h-60">
+                    <!-- Y轴标签 - 左侧病害数 -->
+                    <div class="absolute -left-2 top-0 text-xs text-gray-500">350</div>
+                    <div class="absolute -left-2 top-1/4 text-xs text-gray-500">260</div>
+                    <div class="absolute -left-2 top-2/4 text-xs text-gray-500">170</div>
+                    <div class="absolute -left-2 top-3/4 text-xs text-gray-500">85</div>
+                    <div class="absolute -left-2 bottom-0 text-xs text-gray-500">0</div>
+                    
+                    <!-- Y轴标签 - 右侧修复率 -->
+                    <div class="absolute -right-2 top-0 text-xs text-gray-500">100%</div>
+                    <div class="absolute -right-2 top-1/4 text-xs text-gray-500">75%</div>
+                    <div class="absolute -right-2 top-2/4 text-xs text-gray-500">50%</div>
+                    <div class="absolute -right-2 top-3/4 text-xs text-gray-500">25%</div>
+                    <div class="absolute -right-2 bottom-0 text-xs text-gray-500">0%</div>
+                    
+                    <!-- X轴标签 - 月份 -->
+                    <div class="absolute left-0 -bottom-5 text-xs text-gray-500">1月</div>
+                    <div class="absolute left-1/6 -bottom-5 text-xs text-gray-500">2月</div>
+                    <div class="absolute left-2/6 -bottom-5 text-xs text-gray-500">3月</div>
+                    <div class="absolute left-3/6 -bottom-5 text-xs text-gray-500">4月</div>
+                    <div class="absolute left-4/6 -bottom-5 text-xs text-gray-500">5月</div>
+                    <div class="absolute left-5/6 -bottom-5 text-xs text-gray-500">6月</div>
+                    
+                    <!-- 网格线 -->
+                    <div class="absolute left-0 right-0 top-0 border-t border-gray-200"></div>
+                    <div class="absolute left-0 right-0 top-1/4 border-t border-gray-200"></div>
+                    <div class="absolute left-0 right-0 top-2/4 border-t border-gray-200"></div>
+                    <div class="absolute left-0 right-0 top-3/4 border-t border-gray-200"></div>
+                    <div class="absolute left-0 right-0 bottom-0 border-t border-gray-200"></div>
+                    
+                    <!-- 图表主体区域 - 添加更大内边距防止曲线溢出 -->
+                    <div class="absolute inset-0 pt-16 pb-12 pl-16 pr-16">
+                        <!-- 曲线已删除，仅保留坐标轴 -->
+                    </div>
+                </div>
+                <div class="flex justify-center items-center text-sm mt-8">
+                    <div class="flex items-center mr-4">
+                        <div class="w-3 h-3 bg-blue-500 mr-1"></div>
+                        <span>病害数</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-green-500 mr-1"></div>
+                        <span>修复率</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟数字滚动效果
+        document.querySelectorAll('.odometer').forEach(el => {
+            const target = parseInt(el.textContent.replace(/,/g, ''));
+            const duration = 2000; // 持续时间
+            const start = 0;
+            const startTime = performance.now();
+            
+            function updateNumber(currentTime) {
+                const elapsedTime = currentTime - startTime;
+                if (elapsedTime > duration) {
+                    el.textContent = target.toLocaleString();
+                    return;
+                }
+                
+                const progress = elapsedTime / duration;
+                const current = Math.floor(start + (target - start) * progress);
+                el.textContent = current.toLocaleString();
+                requestAnimationFrame(updateNumber);
+            }
+            
+            requestAnimationFrame(updateNumber);
+        });
+    </script>
+</body>
+</html> 
